@@ -29,8 +29,8 @@ export default function AdminDashboard() {
 
   if (!isAuthenticated) return null;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setLocation("/");
   };
 
@@ -63,45 +63,49 @@ export default function AdminDashboard() {
                 <CardDescription>Update your personal details and bio.</CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4" onSubmit={(e) => {
+                <form className="space-y-4" onSubmit={async (e) => {
                   e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  updateProfile({
-                    name: formData.get('name') as string,
-                    title: formData.get('title') as string,
-                    bio: formData.get('bio') as string,
-                    email: formData.get('email') as string,
-                    github: formData.get('github') as string,
-                    linkedin: formData.get('linkedin') as string,
-                  });
-                  toast({ title: "Profile Updated" });
+                  try {
+                    const formData = new FormData(e.currentTarget);
+                    await updateProfile({
+                      name: formData.get('name') as string,
+                      title: formData.get('title') as string,
+                      bio: formData.get('bio') as string,
+                      email: formData.get('email') as string,
+                      github: formData.get('github') as string || "",
+                      linkedin: formData.get('linkedin') as string || "",
+                    });
+                    toast({ title: "Profile Updated", description: "Your profile has been updated successfully." });
+                  } catch (error) {
+                    toast({ variant: "destructive", title: "Error", description: "Failed to update profile." });
+                  }
                 }}>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Name</Label>
-                      <Input name="name" defaultValue={profile.name} className="bg-background/50" />
+                      <Input name="name" defaultValue={profile?.name || ""} className="bg-background/50" required />
                     </div>
                     <div className="space-y-2">
                       <Label>Title</Label>
-                      <Input name="title" defaultValue={profile.title} className="bg-background/50" />
+                      <Input name="title" defaultValue={profile?.title || ""} className="bg-background/50" required />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Bio</Label>
-                    <Textarea name="bio" defaultValue={profile.bio} className="bg-background/50 min-h-[100px]" />
+                    <Textarea name="bio" defaultValue={profile?.bio || ""} className="bg-background/50 min-h-[100px]" required />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                      <div className="space-y-2">
                       <Label>Email</Label>
-                      <Input name="email" defaultValue={profile.email} className="bg-background/50" />
+                      <Input name="email" type="email" defaultValue={profile?.email || ""} className="bg-background/50" required />
                     </div>
                     <div className="space-y-2">
                       <Label>GitHub URL</Label>
-                      <Input name="github" defaultValue={profile.github} className="bg-background/50" />
+                      <Input name="github" type="url" defaultValue={profile?.github || ""} className="bg-background/50" />
                     </div>
                     <div className="space-y-2">
                       <Label>LinkedIn URL</Label>
-                      <Input name="linkedin" defaultValue={profile.linkedin} className="bg-background/50" />
+                      <Input name="linkedin" type="url" defaultValue={profile?.linkedin || ""} className="bg-background/50" />
                     </div>
                   </div>
                   <Button type="submit" className="bg-primary text-white">
@@ -126,7 +130,14 @@ export default function AdminDashboard() {
                          <h3 className="font-bold">{project.title}</h3>
                          <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
                        </div>
-                       <Button variant="ghost" size="icon" onClick={() => deleteProject(project.id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                       <Button variant="ghost" size="icon" onClick={async () => {
+                       try {
+                         await deleteProject(project.id);
+                         toast({ title: "Project Deleted", description: "Project has been deleted successfully." });
+                       } catch (error) {
+                         toast({ variant: "destructive", title: "Error", description: "Failed to delete project." });
+                       }
+                     }} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
                          <Trash2 className="h-4 w-4" />
                        </Button>
                      </div>
@@ -139,22 +150,28 @@ export default function AdminDashboard() {
                     <CardTitle>Add Project</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <form className="space-y-4" onSubmit={(e) => {
+                    <form className="space-y-4" onSubmit={async (e) => {
                       e.preventDefault();
-                      const formData = new FormData(e.currentTarget);
-                      addProject({
-                        title: formData.get('title') as string,
-                        description: formData.get('description') as string,
-                        image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=2070&auto=format&fit=crop", // placeholder
-                        link: "#",
-                        tech: (formData.get('tech') as string).split(',').map(s => s.trim())
-                      });
-                      (e.target as HTMLFormElement).reset();
-                      toast({ title: "Project Added" });
+                      try {
+                        const formData = new FormData(e.currentTarget);
+                        await addProject({
+                          title: formData.get('title') as string,
+                          description: formData.get('description') as string,
+                          image: formData.get('image') as string || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=2070&auto=format&fit=crop",
+                          link: formData.get('link') as string || "#",
+                          tech: (formData.get('tech') as string).split(',').map(s => s.trim())
+                        });
+                        (e.target as HTMLFormElement).reset();
+                        toast({ title: "Project Added", description: "Project has been added successfully." });
+                      } catch (error) {
+                        toast({ variant: "destructive", title: "Error", description: "Failed to add project." });
+                      }
                     }}>
                       <Input name="title" placeholder="Project Title" required className="bg-background/50" />
                       <Textarea name="description" placeholder="Description" required className="bg-background/50" />
-                      <Input name="tech" placeholder="Tech (comma separated)" required className="bg-background/50" />
+                      <Input name="image" placeholder="Image URL" className="bg-background/50" />
+                      <Input name="link" placeholder="Project Link" className="bg-background/50" />
+                      <Input name="tech" placeholder="Tech (comma separated, e.g., React, Node.js, PostgreSQL)" required className="bg-background/50" />
                       <Button type="submit" className="w-full bg-primary text-white">
                         <Plus className="mr-2 h-4 w-4" /> Add Project
                       </Button>
@@ -177,7 +194,14 @@ export default function AdminDashboard() {
                      {skills.map((skill) => (
                        <div key={skill.id} className="bg-white/5 px-3 py-1.5 rounded-md flex items-center gap-2 border border-white/5 group">
                          <span className="text-sm">{skill.name}</span>
-                         <button onClick={() => deleteSkill(skill.id)} className="text-muted-foreground hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button onClick={async () => {
+                           try {
+                             await deleteSkill(skill.id);
+                             toast({ title: "Skill Deleted", description: "Skill has been deleted successfully." });
+                           } catch (error) {
+                             toast({ variant: "destructive", title: "Error", description: "Failed to delete skill." });
+                           }
+                         }} className="text-muted-foreground hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
                            <Trash2 className="h-3 w-3" />
                          </button>
                        </div>
@@ -191,18 +215,34 @@ export default function AdminDashboard() {
                    <CardTitle>Add Skill</CardTitle>
                  </CardHeader>
                  <CardContent>
-                   <form className="flex gap-2" onSubmit={(e) => {
+                   <form className="space-y-4" onSubmit={async (e) => {
                      e.preventDefault();
-                     const formData = new FormData(e.currentTarget);
-                     addSkill({
-                       name: formData.get('name') as string,
-                       category: "Frontend" // simplified
-                     });
-                     (e.target as HTMLFormElement).reset();
+                     try {
+                       const formData = new FormData(e.currentTarget);
+                       await addSkill({
+                         name: formData.get('name') as string,
+                         category: (formData.get('category') as "Frontend" | "Backend" | "Tools") || "Frontend"
+                       });
+                       (e.target as HTMLFormElement).reset();
+                       toast({ title: "Skill Added", description: "Skill has been added successfully." });
+                     } catch (error) {
+                       toast({ variant: "destructive", title: "Error", description: "Failed to add skill." });
+                     }
                    }}>
-                     <Input name="name" placeholder="Skill Name" required className="bg-background/50" />
-                     <Button type="submit" size="icon" className="shrink-0 bg-primary">
-                       <Plus className="h-4 w-4" />
+                     <div className="space-y-2">
+                       <Label>Category</Label>
+                       <select name="category" className="w-full px-3 py-2 bg-background/50 border border-white/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" defaultValue="Frontend">
+                         <option value="Frontend">Frontend</option>
+                         <option value="Backend">Backend</option>
+                         <option value="Tools">Tools</option>
+                       </select>
+                     </div>
+                     <div className="space-y-2">
+                       <Label>Skill Name</Label>
+                       <Input name="name" placeholder="e.g., React, Node.js" required className="bg-background/50" />
+                     </div>
+                     <Button type="submit" className="w-full bg-primary text-white">
+                       <Plus className="mr-2 h-4 w-4" /> Add Skill
                      </Button>
                    </form>
                  </CardContent>
@@ -222,7 +262,14 @@ export default function AdminDashboard() {
                        <p className="text-xs text-muted-foreground mb-2">{exp.period}</p>
                        <p className="text-sm text-muted-foreground">{exp.description}</p>
                      </div>
-                     <Button variant="ghost" size="icon" onClick={() => deleteExperience(exp.id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0 ml-4">
+                     <Button variant="ghost" size="icon" onClick={async () => {
+                       try {
+                         await deleteExperience(exp.id);
+                         toast({ title: "Experience Deleted", description: "Experience has been deleted successfully." });
+                       } catch (error) {
+                         toast({ variant: "destructive", title: "Error", description: "Failed to delete experience." });
+                       }
+                     }} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0 ml-4">
                        <Trash2 className="h-4 w-4" />
                      </Button>
                    </Card>
@@ -234,17 +281,21 @@ export default function AdminDashboard() {
                     <CardTitle>Add Experience</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <form className="space-y-4" onSubmit={(e) => {
+                    <form className="space-y-4" onSubmit={async (e) => {
                       e.preventDefault();
-                      const formData = new FormData(e.currentTarget);
-                      addExperience({
-                        role: formData.get('role') as string,
-                        company: formData.get('company') as string,
-                        period: formData.get('period') as string,
-                        description: formData.get('description') as string,
-                      });
-                      (e.target as HTMLFormElement).reset();
-                      toast({ title: "Experience Added" });
+                      try {
+                        const formData = new FormData(e.currentTarget);
+                        await addExperience({
+                          role: formData.get('role') as string,
+                          company: formData.get('company') as string,
+                          period: formData.get('period') as string,
+                          description: formData.get('description') as string,
+                        });
+                        (e.target as HTMLFormElement).reset();
+                        toast({ title: "Experience Added", description: "Experience has been added successfully." });
+                      } catch (error) {
+                        toast({ variant: "destructive", title: "Error", description: "Failed to add experience." });
+                      }
                     }}>
                       <Input name="role" placeholder="Role / Position" required className="bg-background/50" />
                       <Input name="company" placeholder="Company Name" required className="bg-background/50" />

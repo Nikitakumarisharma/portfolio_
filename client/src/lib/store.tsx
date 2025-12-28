@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 // Types
 export interface Project {
@@ -34,146 +34,223 @@ export interface Profile {
 }
 
 interface PortfolioContextType {
-  profile: Profile;
+  profile: Profile | null;
   projects: Project[];
   skills: Skill[];
   experience: Experience[];
   isAuthenticated: boolean;
-  login: (password: string) => boolean;
-  logout: () => void;
-  updateProfile: (profile: Profile) => void;
-  addProject: (project: Omit<Project, "id">) => void;
-  deleteProject: (id: string) => void;
-  addSkill: (skill: Omit<Skill, "id">) => void;
-  deleteSkill: (id: string) => void;
-  addExperience: (exp: Omit<Experience, "id">) => void;
-  deleteExperience: (id: string) => void;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  updateProfile: (profile: Profile) => Promise<void>;
+  addProject: (project: Omit<Project, "id">) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+  addSkill: (skill: Omit<Skill, "id">) => Promise<void>;
+  deleteSkill: (id: string) => Promise<void>;
+  addExperience: (exp: Omit<Experience, "id">) => Promise<void>;
+  deleteExperience: (id: string) => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
 
-// Initial Mock Data
-const initialProfile: Profile = {
-  name: "Nikita",
-  title: "Full Stack Developer",
-  bio: "Building digital experiences with code and creativity. Specialized in Next.js, Node.js, and modern UI architectures.",
-  email: "hello@nikita.dev",
-  github: "https://github.com",
-  linkedin: "https://linkedin.com"
-};
+// API helper function
+async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(`/api${endpoint}`, {
+    ...options,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
-const initialProjects: Project[] = [
-  {
-    id: "1",
-    title: "E-Commerce Dashboard",
-    description: "A comprehensive analytics dashboard for online retailers with real-time data visualization.",
-    tech: ["Next.js", "Tailwind", "Recharts"],
-    link: "#",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2426&auto=format&fit=crop"
-  },
-  {
-    id: "2",
-    title: "AI Content Generator",
-    description: "SaaS application that uses LLMs to generate marketing copy and blog posts.",
-    tech: ["React", "OpenAI API", "Node.js"],
-    link: "#",
-    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=2532&auto=format&fit=crop"
-  },
-  {
-    id: "3",
-    title: "Task Master",
-    description: "Collaborative project management tool with drag-and-drop kanban boards.",
-    tech: ["Vue", "Firebase", "Pinia"],
-    link: "#",
-    image: "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?q=80&w=2372&auto=format&fit=crop"
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "An error occurred" }));
+    throw new Error(error.message || `HTTP error! status: ${response.status}`);
   }
-];
 
-const initialSkills: Skill[] = [
-  { id: "1", name: "React", category: "Frontend" },
-  { id: "2", name: "Next.js", category: "Frontend" },
-  { id: "3", name: "TypeScript", category: "Frontend" },
-  { id: "4", name: "Tailwind CSS", category: "Frontend" },
-  { id: "5", name: "Node.js", category: "Backend" },
-  { id: "6", name: "PostgreSQL", category: "Backend" },
-  { id: "7", name: "Prisma", category: "Backend" },
-  { id: "8", name: "Docker", category: "Tools" },
-  { id: "9", name: "Git", category: "Tools" },
-  { id: "10", name: "AWS", category: "Tools" }
-];
-
-const initialExperience: Experience[] = [
-  {
-    id: "1",
-    role: "Senior Frontend Engineer",
-    company: "TechCorp Inc.",
-    period: "2023 - Present",
-    description: "Leading the frontend team in rebuilding the core product dashboard. Improved performance by 40%."
-  },
-  {
-    id: "2",
-    role: "Full Stack Developer",
-    company: "Creative Agency",
-    period: "2021 - 2023",
-    description: "Developed custom web solutions for diverse clients using the MERN stack."
-  }
-];
+  return response.json();
+}
 
 export function PortfolioProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<Profile>(initialProfile);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [skills, setSkills] = useState<Skill[]>(initialSkills);
-  const [experience, setExperience] = useState<Experience[]>(initialExperience);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [experience, setExperience] = useState<Experience[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = (password: string) => {
-    // Mock authentication - simpler for prototype
-    if (password === "admin123") {
+  // Check authentication status on mount
+  useEffect(() => {
+    checkAuth();
+    loadData();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      await apiRequest("/auth/me");
+      setIsAuthenticated(true);
+    } catch {
+      setIsAuthenticated(false);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [profileData, projectsData, skillsData, experienceData] = await Promise.all([
+        apiRequest<Profile>("/profile").catch(() => null),
+        apiRequest<Project[]>("/projects").catch(() => []),
+        apiRequest<Skill[]>("/skills").catch(() => []),
+        apiRequest<Experience[]>("/experience").catch(() => []),
+      ]);
+
+      if (profileData) setProfile(profileData);
+      setProjects(projectsData);
+      setSkills(skillsData);
+      setExperience(experienceData);
+    } catch (error) {
+      console.error("Failed to load data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshData = async () => {
+    await loadData();
+  };
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      await apiRequest("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
       setIsAuthenticated(true);
       return true;
+    } catch {
+      setIsAuthenticated(false);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => setIsAuthenticated(false);
-
-  const updateProfile = (newProfile: Profile) => setProfile(newProfile);
-
-  const addProject = (project: Omit<Project, "id">) => {
-    const newProject = { ...project, id: Math.random().toString(36).substr(2, 9) };
-    setProjects([...projects, newProject]);
+  const logout = async (): Promise<void> => {
+    try {
+      await apiRequest("/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setIsAuthenticated(false);
+    }
   };
 
-  const deleteProject = (id: string) => {
-    setProjects(projects.filter(p => p.id !== id));
+  const updateProfile = async (newProfile: Profile): Promise<void> => {
+    try {
+      const updated = await apiRequest<Profile>("/profile", {
+        method: "PUT",
+        body: JSON.stringify(newProfile),
+      });
+      setProfile(updated);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      throw error;
+    }
   };
 
-  const addSkill = (skill: Omit<Skill, "id">) => {
-    const newSkill = { ...skill, id: Math.random().toString(36).substr(2, 9) };
-    setSkills([...skills, newSkill]);
+  const addProject = async (project: Omit<Project, "id">): Promise<void> => {
+    try {
+      const newProject = await apiRequest<Project>("/projects", {
+        method: "POST",
+        body: JSON.stringify(project),
+      });
+      setProjects([...projects, newProject]);
+    } catch (error) {
+      console.error("Failed to add project:", error);
+      throw error;
+    }
   };
 
-  const deleteSkill = (id: string) => {
-    setSkills(skills.filter(s => s.id !== id));
+  const deleteProject = async (id: string): Promise<void> => {
+    try {
+      await apiRequest(`/projects/${id}`, { method: "DELETE" });
+      setProjects(projects.filter((p) => p.id !== id));
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      throw error;
+    }
   };
 
-  const addExperience = (exp: Omit<Experience, "id">) => {
-    const newExp = { ...exp, id: Math.random().toString(36).substr(2, 9) };
-    setExperience([...experience, newExp]);
+  const addSkill = async (skill: Omit<Skill, "id">): Promise<void> => {
+    try {
+      const newSkill = await apiRequest<Skill>("/skills", {
+        method: "POST",
+        body: JSON.stringify(skill),
+      });
+      setSkills([...skills, newSkill]);
+    } catch (error) {
+      console.error("Failed to add skill:", error);
+      throw error;
+    }
   };
 
-  const deleteExperience = (id: string) => {
-    setExperience(experience.filter(e => e.id !== id));
+  const deleteSkill = async (id: string): Promise<void> => {
+    try {
+      await apiRequest(`/skills/${id}`, { method: "DELETE" });
+      setSkills(skills.filter((s) => s.id !== id));
+    } catch (error) {
+      console.error("Failed to delete skill:", error);
+      throw error;
+    }
+  };
+
+  const addExperience = async (exp: Omit<Experience, "id">): Promise<void> => {
+    try {
+      const newExp = await apiRequest<Experience>("/experience", {
+        method: "POST",
+        body: JSON.stringify(exp),
+      });
+      setExperience([...experience, newExp]);
+    } catch (error) {
+      console.error("Failed to add experience:", error);
+      throw error;
+    }
+  };
+
+  const deleteExperience = async (id: string): Promise<void> => {
+    try {
+      await apiRequest(`/experience/${id}`, { method: "DELETE" });
+      setExperience(experience.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("Failed to delete experience:", error);
+      throw error;
+    }
   };
 
   return (
-    <PortfolioContext.Provider value={{
-      profile, projects, skills, experience, isAuthenticated,
-      login, logout, updateProfile,
-      addProject, deleteProject,
-      addSkill, deleteSkill,
-      addExperience, deleteExperience
-    }}>
+    <PortfolioContext.Provider
+      value={{
+        profile,
+        projects,
+        skills,
+        experience,
+        isAuthenticated,
+        isLoading,
+        login,
+        logout,
+        updateProfile,
+        addProject,
+        deleteProject,
+        addSkill,
+        deleteSkill,
+        addExperience,
+        deleteExperience,
+        refreshData,
+      }}
+    >
       {children}
     </PortfolioContext.Provider>
   );

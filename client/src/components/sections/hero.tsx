@@ -7,6 +7,16 @@ import heroBg from "@assets/generated_images/dark_abstract_purple_neon_geometric
 export function Hero() {
   const { profile } = usePortfolio();
 
+  if (!profile) {
+    return (
+      <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
+        <div className="container mx-auto px-6 relative z-20 text-center">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
       {/* Background Image with Overlay */}

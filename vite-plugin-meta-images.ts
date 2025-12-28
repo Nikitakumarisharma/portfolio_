@@ -2,10 +2,6 @@ import type { Plugin } from 'vite';
 import fs from 'fs';
 import path from 'path';
 
-/**
- * Vite plugin that updates og:image and twitter:image meta tags
- * to point to the app's opengraph image with the correct Replit domain.
- */
 export function metaImagesPlugin(): Plugin {
   return {
     name: 'vite-plugin-meta-images',
