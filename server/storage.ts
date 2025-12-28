@@ -1,61 +1,89 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
-import { Pool } from "pg";
-import {
-  users,
-  profile,
-  projects,
-  skills,
-  experience,
-  type User,
-  type InsertUser,
-  type Profile,
-  type InsertProfile,
-  type Project,
-  type InsertProject,
-  type Skill,
-  type InsertSkill,
-  type Experience,
-  type InsertExperience,
-} from "@shared/schema";
+import { PrismaClient } from "@prisma/client";
+import { z } from "zod";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+const prisma = new PrismaClient();
+
+export const db = prisma;
+
+// Zod schemas for validation (matching Prisma schema)
+export const insertUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+  role: z.string().optional(),
 });
 
-export const db = drizzle(pool);
+export const insertProfileSchema = z.object({
+  name: z.string(),
+  title: z.string(),
+  bio: z.string(),
+  email: z.string().email(),
+  github: z.string().optional(),
+  linkedin: z.string().optional(),
+});
+
+export const insertProjectSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  image: z.string(),
+  link: z.string().optional(),
+  tech: z.string(),
+});
+
+export const insertSkillSchema = z.object({
+  name: z.string(),
+  category: z.string(),
+});
+
+export const insertExperienceSchema = z.object({
+  role: z.string(),
+  company: z.string(),
+  period: z.string(),
+  description: z.string(),
+});
+
+// Type exports
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = Awaited<ReturnType<typeof prisma.user.findUnique>>;
+export type Profile = Awaited<ReturnType<typeof prisma.profile.findUnique>>;
+export type InsertProfile = z.infer<typeof insertProfileSchema>;
+export type Project = Awaited<ReturnType<typeof prisma.project.findUnique>>;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Skill = Awaited<ReturnType<typeof prisma.skill.findUnique>>;
+export type InsertSkill = z.infer<typeof insertSkillSchema>;
+export type Experience = Awaited<ReturnType<typeof prisma.experience.findUnique>>;
+export type InsertExperience = z.infer<typeof insertExperienceSchema>;
 
 export interface IStorage {
   // User/Auth methods
-  getUser(id: string): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
+  getUser(id: string): Promise<User | null>;
+  getUserByEmail(email: string): Promise<User | null>;
   createUser(user: InsertUser): Promise<User>;
 
   // Profile methods
-  getProfile(): Promise<Profile | undefined>;
+  getProfile(): Promise<Profile | null>;
   updateProfile(profileData: InsertProfile): Promise<Profile>;
   createProfile(profileData: InsertProfile): Promise<Profile>;
 
   // Project methods
   getProjects(): Promise<Project[]>;
-  getProject(id: string): Promise<Project | undefined>;
+  getProject(id: string): Promise<Project | null>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, project: Partial<InsertProject>): Promise<Project>;
   deleteProject(id: string): Promise<void>;
 
   // Skill methods
   getSkills(): Promise<Skill[]>;
-  getSkill(id: string): Promise<Skill | undefined>;
+  getSkill(id: string): Promise<Skill | null>;
   createSkill(skill: InsertSkill): Promise<Skill>;
   deleteSkill(id: string): Promise<void>;
 
   // Experience methods
   getExperience(): Promise<Experience[]>;
-  getExperienceById(id: string): Promise<Experience | undefined>;
+  getExperienceById(id: string): Promise<Experience | null>;
   createExperience(exp: InsertExperience): Promise<Experience>;
   updateExperience(id: string, exp: Partial<InsertExperience>): Promise<Experience>;
   deleteExperience(id: string): Promise<void>;
@@ -63,30 +91,25 @@ export interface IStorage {
 
 export class PostgresStorage implements IStorage {
   // User/Auth methods
-  async getUser(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
+  async getUser(id: string): Promise<User | null> {
+    return await prisma.user.findUnique({ where: { id } });
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    return result[0];
+  async getUserByEmail(email: string): Promise<User | null> {
+    return await prisma.user.findUnique({ where: { email } });
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(user).returning();
-    return result[0];
+    return await prisma.user.create({ data: user });
   }
 
   // Profile methods
-  async getProfile(): Promise<Profile | undefined> {
-    const result = await db.select().from(profile).limit(1);
-    return result[0];
+  async getProfile(): Promise<Profile | null> {
+    return await prisma.profile.findFirst();
   }
 
   async createProfile(profileData: InsertProfile): Promise<Profile> {
-    const result = await db.insert(profile).values(profileData).returning();
-    return result[0];
+    return await prisma.profile.create({ data: profileData });
   }
 
   async updateProfile(profileData: InsertProfile): Promise<Profile> {
@@ -94,87 +117,81 @@ export class PostgresStorage implements IStorage {
     if (!existing) {
       return await this.createProfile(profileData);
     }
-    const result = await db
-      .update(profile)
-      .set({ ...profileData, updatedAt: new Date() })
-      .where(eq(profile.id, existing.id))
-      .returning();
-    return result[0];
+    return await prisma.profile.update({
+      where: { id: existing.id },
+      data: profileData,
+    });
   }
 
   // Project methods
   async getProjects(): Promise<Project[]> {
-    return await db.select().from(projects).orderBy(projects.createdAt);
+    return await prisma.project.findMany({
+      orderBy: { createdAt: "asc" },
+    });
   }
 
-  async getProject(id: string): Promise<Project | undefined> {
-    const result = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
-    return result[0];
+  async getProject(id: string): Promise<Project | null> {
+    return await prisma.project.findUnique({ where: { id } });
   }
 
   async createProject(project: InsertProject): Promise<Project> {
-    const result = await db.insert(projects).values(project).returning();
-    return result[0];
+    return await prisma.project.create({ data: project });
   }
 
   async updateProject(id: string, project: Partial<InsertProject>): Promise<Project> {
-    const result = await db
-      .update(projects)
-      .set({ ...project, updatedAt: new Date() })
-      .where(eq(projects.id, id))
-      .returning();
-    return result[0];
+    return await prisma.project.update({
+      where: { id },
+      data: project,
+    });
   }
 
   async deleteProject(id: string): Promise<void> {
-    await db.delete(projects).where(eq(projects.id, id));
+    await prisma.project.delete({ where: { id } });
   }
 
   // Skill methods
   async getSkills(): Promise<Skill[]> {
-    return await db.select().from(skills).orderBy(skills.createdAt);
+    return await prisma.skill.findMany({
+      orderBy: { createdAt: "asc" },
+    });
   }
 
-  async getSkill(id: string): Promise<Skill | undefined> {
-    const result = await db.select().from(skills).where(eq(skills.id, id)).limit(1);
-    return result[0];
+  async getSkill(id: string): Promise<Skill | null> {
+    return await prisma.skill.findUnique({ where: { id } });
   }
 
   async createSkill(skill: InsertSkill): Promise<Skill> {
-    const result = await db.insert(skills).values(skill).returning();
-    return result[0];
+    return await prisma.skill.create({ data: skill });
   }
 
   async deleteSkill(id: string): Promise<void> {
-    await db.delete(skills).where(eq(skills.id, id));
+    await prisma.skill.delete({ where: { id } });
   }
 
   // Experience methods
   async getExperience(): Promise<Experience[]> {
-    return await db.select().from(experience).orderBy(experience.createdAt);
+    return await prisma.experience.findMany({
+      orderBy: { createdAt: "asc" },
+    });
   }
 
-  async getExperienceById(id: string): Promise<Experience | undefined> {
-    const result = await db.select().from(experience).where(eq(experience.id, id)).limit(1);
-    return result[0];
+  async getExperienceById(id: string): Promise<Experience | null> {
+    return await prisma.experience.findUnique({ where: { id } });
   }
 
   async createExperience(exp: InsertExperience): Promise<Experience> {
-    const result = await db.insert(experience).values(exp).returning();
-    return result[0];
+    return await prisma.experience.create({ data: exp });
   }
 
   async updateExperience(id: string, exp: Partial<InsertExperience>): Promise<Experience> {
-    const result = await db
-      .update(experience)
-      .set({ ...exp, updatedAt: new Date() })
-      .where(eq(experience.id, id))
-      .returning();
-    return result[0];
+    return await prisma.experience.update({
+      where: { id },
+      data: exp,
+    });
   }
 
   async deleteExperience(id: string): Promise<void> {
-    await db.delete(experience).where(eq(experience.id, id));
+    await prisma.experience.delete({ where: { id } });
   }
 }
 

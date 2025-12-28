@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { usePortfolio } from "@/lib/store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,19 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Save, LogOut } from "lucide-react";
+import { Plus, Trash2, Save, LogOut, Edit2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
   const { 
     isAuthenticated, logout, 
     profile, updateProfile,
-    projects, addProject, deleteProject,
+    projects, addProject, updateProject, deleteProject,
     skills, addSkill, deleteSkill,
-    experience, addExperience, deleteExperience
+    experience, addExperience, updateExperience, deleteExperience
   } = usePortfolio();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [editingProject, setEditingProject] = useState<string | null>(null);
+  const [editingExperience, setEditingExperience] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -121,27 +123,70 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-4">
                 {projects.map((project) => (
-                   <Card key={project.id} className="bg-card/50 border-white/5 overflow-hidden flex flex-row h-32">
-                     <div className="w-32 h-full shrink-0">
-                       <img src={project.image} alt="" className="w-full h-full object-cover" />
-                     </div>
-                     <div className="p-4 flex-1 flex justify-between">
-                       <div>
-                         <h3 className="font-bold">{project.title}</h3>
-                         <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
-                       </div>
-                       <Button variant="ghost" size="icon" onClick={async () => {
-                       try {
-                         await deleteProject(project.id);
-                         toast({ title: "Project Deleted", description: "Project has been deleted successfully." });
-                       } catch (error) {
-                         toast({ variant: "destructive", title: "Error", description: "Failed to delete project." });
-                       }
-                     }} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
-                     </div>
-                   </Card>
+                  <Card key={project.id} className="bg-card/50 border-white/5">
+                    {editingProject === project.id ? (
+                      <CardContent className="p-4">
+                        <form className="space-y-4" onSubmit={async (e) => {
+                          e.preventDefault();
+                          try {
+                            const formData = new FormData(e.currentTarget);
+                            await updateProject(project.id, {
+                              title: formData.get('title') as string,
+                              description: formData.get('description') as string,
+                              image: formData.get('image') as string,
+                              link: formData.get('link') as string || "#",
+                              tech: (formData.get('tech') as string).split(',').map(s => s.trim())
+                            });
+                            setEditingProject(null);
+                            toast({ title: "Project Updated", description: "Project has been updated successfully." });
+                          } catch (error) {
+                            toast({ variant: "destructive", title: "Error", description: "Failed to update project." });
+                          }
+                        }}>
+                          <Input name="title" defaultValue={project.title} required className="bg-background/50" />
+                          <Textarea name="description" defaultValue={project.description} required className="bg-background/50" />
+                          <Input name="image" defaultValue={project.image} className="bg-background/50" />
+                          <Input name="link" defaultValue={project.link} className="bg-background/50" />
+                          <Input name="tech" defaultValue={Array.isArray(project.tech) ? project.tech.join(', ') : project.tech} required className="bg-background/50" />
+                          <div className="flex gap-2">
+                            <Button type="submit" className="flex-1 bg-primary text-white">
+                              <Save className="mr-2 h-4 w-4" /> Save
+                            </Button>
+                            <Button type="button" variant="outline" onClick={() => setEditingProject(null)} className="flex-1">
+                              <X className="mr-2 h-4 w-4" /> Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </CardContent>
+                    ) : (
+                      <div className="overflow-hidden flex flex-row h-32">
+                        <div className="w-32 h-full shrink-0">
+                          <img src={project.image} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="p-4 flex-1 flex justify-between">
+                          <div>
+                            <h3 className="font-bold">{project.title}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => setEditingProject(project.id)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={async () => {
+                              try {
+                                await deleteProject(project.id);
+                                toast({ title: "Project Deleted", description: "Project has been deleted successfully." });
+                              } catch (error) {
+                                toast({ variant: "destructive", title: "Error", description: "Failed to delete project." });
+                              }
+                            }} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
                 ))}
               </div>
               <div>
@@ -221,7 +266,7 @@ export default function AdminDashboard() {
                        const formData = new FormData(e.currentTarget);
                        await addSkill({
                          name: formData.get('name') as string,
-                         category: (formData.get('category') as "Frontend" | "Backend" | "Tools") || "Frontend"
+                         category: "Tools" // Default category, not displayed
                        });
                        (e.target as HTMLFormElement).reset();
                        toast({ title: "Skill Added", description: "Skill has been added successfully." });
@@ -230,16 +275,8 @@ export default function AdminDashboard() {
                      }
                    }}>
                      <div className="space-y-2">
-                       <Label>Category</Label>
-                       <select name="category" className="w-full px-3 py-2 bg-background/50 border border-white/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" defaultValue="Frontend">
-                         <option value="Frontend">Frontend</option>
-                         <option value="Backend">Backend</option>
-                         <option value="Tools">Tools</option>
-                       </select>
-                     </div>
-                     <div className="space-y-2">
                        <Label>Skill Name</Label>
-                       <Input name="name" placeholder="e.g., React, Node.js" required className="bg-background/50" />
+                       <Input name="name" placeholder="e.g., React, Node.js, TypeScript" required className="bg-background/50" />
                      </div>
                      <Button type="submit" className="w-full bg-primary text-white">
                        <Plus className="mr-2 h-4 w-4" /> Add Skill
@@ -255,24 +292,65 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-4">
                 {experience.map((exp) => (
-                   <Card key={exp.id} className="bg-card/50 border-white/5 p-4 flex justify-between items-start">
-                     <div>
-                       <h3 className="font-bold">{exp.role}</h3>
-                       <p className="text-primary text-sm">{exp.company}</p>
-                       <p className="text-xs text-muted-foreground mb-2">{exp.period}</p>
-                       <p className="text-sm text-muted-foreground">{exp.description}</p>
-                     </div>
-                     <Button variant="ghost" size="icon" onClick={async () => {
-                       try {
-                         await deleteExperience(exp.id);
-                         toast({ title: "Experience Deleted", description: "Experience has been deleted successfully." });
-                       } catch (error) {
-                         toast({ variant: "destructive", title: "Error", description: "Failed to delete experience." });
-                       }
-                     }} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0 ml-4">
-                       <Trash2 className="h-4 w-4" />
-                     </Button>
-                   </Card>
+                  <Card key={exp.id} className="bg-card/50 border-white/5">
+                    {editingExperience === exp.id ? (
+                      <CardContent className="p-4">
+                        <form className="space-y-4" onSubmit={async (e) => {
+                          e.preventDefault();
+                          try {
+                            const formData = new FormData(e.currentTarget);
+                            await updateExperience(exp.id, {
+                              role: formData.get('role') as string,
+                              company: formData.get('company') as string,
+                              period: formData.get('period') as string,
+                              description: formData.get('description') as string,
+                            });
+                            setEditingExperience(null);
+                            toast({ title: "Experience Updated", description: "Experience has been updated successfully." });
+                          } catch (error) {
+                            toast({ variant: "destructive", title: "Error", description: "Failed to update experience." });
+                          }
+                        }}>
+                          <Input name="role" defaultValue={exp.role} required className="bg-background/50" />
+                          <Input name="company" defaultValue={exp.company} required className="bg-background/50" />
+                          <Input name="period" defaultValue={exp.period} required className="bg-background/50" />
+                          <Textarea name="description" defaultValue={exp.description} required className="bg-background/50" />
+                          <div className="flex gap-2">
+                            <Button type="submit" className="flex-1 bg-primary text-white">
+                              <Save className="mr-2 h-4 w-4" /> Save
+                            </Button>
+                            <Button type="button" variant="outline" onClick={() => setEditingExperience(null)} className="flex-1">
+                              <X className="mr-2 h-4 w-4" /> Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </CardContent>
+                    ) : (
+                      <div className="p-4 flex justify-between items-start">
+                        <div>
+                          <h3 className="font-bold">{exp.role}</h3>
+                          <p className="text-primary text-sm">{exp.company}</p>
+                          <p className="text-xs text-muted-foreground mb-2">{exp.period}</p>
+                          <p className="text-sm text-muted-foreground">{exp.description}</p>
+                        </div>
+                        <div className="flex gap-2 shrink-0 ml-4">
+                          <Button variant="ghost" size="icon" onClick={() => setEditingExperience(exp.id)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={async () => {
+                            try {
+                              await deleteExperience(exp.id);
+                              toast({ title: "Experience Deleted", description: "Experience has been deleted successfully." });
+                            } catch (error) {
+                              toast({ variant: "destructive", title: "Error", description: "Failed to delete experience." });
+                            }
+                          }} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
                 ))}
               </div>
               <div>

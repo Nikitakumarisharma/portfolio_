@@ -44,10 +44,12 @@ interface PortfolioContextType {
   logout: () => Promise<void>;
   updateProfile: (profile: Profile) => Promise<void>;
   addProject: (project: Omit<Project, "id">) => Promise<void>;
+  updateProject: (id: string, project: Partial<Omit<Project, "id">>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   addSkill: (skill: Omit<Skill, "id">) => Promise<void>;
   deleteSkill: (id: string) => Promise<void>;
   addExperience: (exp: Omit<Experience, "id">) => Promise<void>;
+  updateExperience: (id: string, exp: Partial<Omit<Experience, "id">>) => Promise<void>;
   deleteExperience: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
@@ -174,6 +176,19 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateProject = async (id: string, project: Partial<Omit<Project, "id">>): Promise<void> => {
+    try {
+      const updated = await apiRequest<Project>(`/projects/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(project),
+      });
+      setProjects(projects.map((p) => (p.id === id ? updated : p)));
+    } catch (error) {
+      console.error("Failed to update project:", error);
+      throw error;
+    }
+  };
+
   const deleteProject = async (id: string): Promise<void> => {
     try {
       await apiRequest(`/projects/${id}`, { method: "DELETE" });
@@ -220,6 +235,19 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateExperience = async (id: string, exp: Partial<Omit<Experience, "id">>): Promise<void> => {
+    try {
+      const updated = await apiRequest<Experience>(`/experience/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(exp),
+      });
+      setExperience(experience.map((e) => (e.id === id ? updated : e)));
+    } catch (error) {
+      console.error("Failed to update experience:", error);
+      throw error;
+    }
+  };
+
   const deleteExperience = async (id: string): Promise<void> => {
     try {
       await apiRequest(`/experience/${id}`, { method: "DELETE" });
@@ -243,10 +271,12 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         logout,
         updateProfile,
         addProject,
+        updateProject,
         deleteProject,
         addSkill,
         deleteSkill,
         addExperience,
+        updateExperience,
         deleteExperience,
         refreshData,
       }}

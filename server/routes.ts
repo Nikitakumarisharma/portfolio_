@@ -1,3 +1,4 @@
+
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -6,6 +7,13 @@ import expressSession from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { Pool } from "pg";
 import nodemailer from "nodemailer";
+
+// Extend Express Session type
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
+  }
+}
 
 // Session configuration
 const PgSession = ConnectPgSimple(expressSession);
@@ -57,13 +65,6 @@ export async function registerRoutes(
       },
     })
   );
-
-  // Extend Express Session type
-  declare module "express-session" {
-    interface SessionData {
-      userId: string;
-    }
-  }
 
   // ==================== AUTHENTICATION ROUTES ====================
 
@@ -204,6 +205,23 @@ export async function registerRoutes(
     }
   });
 
+  // Get single project (public)
+  app.get("/api/projects/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const project = await storage.getProject(id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json({
+        ...project,
+        tech: typeof project.tech === "string" ? JSON.parse(project.tech) : project.tech,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create project (protected)
   app.post("/api/projects", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -298,6 +316,20 @@ export async function registerRoutes(
     try {
       const experience = await storage.getExperience();
       res.json(experience);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get single experience (public)
+  app.get("/api/experience/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const exp = await storage.getExperienceById(id);
+      if (!exp) {
+        return res.status(404).json({ message: "Experience not found" });
+      }
+      res.json(exp);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

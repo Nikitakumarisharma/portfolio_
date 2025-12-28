@@ -26,18 +26,28 @@ export function Skills() {
       </div>
 
       <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex touch-pan-y gap-4 ml-4">
+        <div className="flex touch-pan-y gap-4">
           {skills.map((skill) => (
             <div 
               key={skill.id} 
-              className="flex-[0_0_auto] min-w-[150px] md:min-w-[200px] mx-4"
+              className="flex-[0_0_auto] min-w-[180px] md:min-w-[220px] px-2"
             >
-              <div className="glass-card p-6 rounded-xl flex flex-col items-center justify-center hover:border-primary/50 transition-colors group h-full">
-                <span className="text-lg font-mono font-medium group-hover:text-primary transition-colors">
+              <div className="glass-card p-8 rounded-xl flex flex-col items-center justify-center hover:border-primary/50 transition-all group h-full min-h-[120px] hover:scale-105">
+                <span className="text-xl font-semibold group-hover:text-primary transition-colors text-center">
                   {skill.name}
                 </span>
-                <span className="text-xs text-muted-foreground mt-2 uppercase tracking-wider">
-                  {skill.category}
+              </div>
+            </div>
+          ))}
+          {/* Duplicate items for seamless loop */}
+          {skills.map((skill) => (
+            <div 
+              key={`${skill.id}-duplicate`} 
+              className="flex-[0_0_auto] min-w-[180px] md:min-w-[220px] px-2"
+            >
+              <div className="glass-card p-8 rounded-xl flex flex-col items-center justify-center hover:border-primary/50 transition-all group h-full min-h-[120px] hover:scale-105">
+                <span className="text-xl font-semibold group-hover:text-primary transition-colors text-center">
+                  {skill.name}
                 </span>
               </div>
             </div>

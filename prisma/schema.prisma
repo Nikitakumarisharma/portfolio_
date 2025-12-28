@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Admin/User table for authentication
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      String   @default("USER")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// Profile table (single row - portfolio owner info)
+model Profile {
+  id        String   @id @default(uuid())
+  name      String
+  title     String
+  bio       String
+  email     String
+  github    String?
+  linkedin  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("profile")
+}
+
+// Projects table
+model Project {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  image       String
+  link        String?
+  tech        String   // JSON array stored as text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("projects")
+}
+
+// Skills table
+model Skill {
+  id        String   @id @default(uuid())
+  name      String
+  category  String   // "Frontend" | "Backend" | "Tools"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("skills")
+}
+
+// Experience table
+model Experience {
+  id          String   @id @default(uuid())
+  role        String
+  company     String
+  period      String
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("experience")
+}
+
+// Session table for connect-pg-simple
+model Session {
+  sid    String   @id
+  sess   Json     @db.JsonB
+  expire DateTime @map("expire")
+
+  @@index([expire])
+  @@map("session")
+}
+
