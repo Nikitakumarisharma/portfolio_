@@ -12,14 +12,7 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(
-    express.static(distPath, {
-      index: false,
-      setHeaders(res) {
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-      },
-    })
-  );
+  app.use(express.static(distPath, { index: false }));
 
   // SPA fallback
   app.get("*", (_req, res) => {
